@@ -21,9 +21,6 @@ library(lme4)
 book <- fread("orders.csv")
 train <- fread("booktrain.csv")
 
-# check that no customers are duplicated in training set
-any(duplicated(train$id))
-
 # train/test sets
 book_train = train[seq(1, nrow(train), 2), ]
 book_test = train[seq(2, nrow(train), 2), ]
@@ -50,8 +47,6 @@ book <- cbind(book,hello[,-1])
 book$logPrice[book$logPrice == -Inf] <- 0
 
 # merge features with training set
-# merged_train <- merge(book_train,book,by="id")
-# merged_test <- merge(book_train,book,by="id")
 merged <- merge(book,train,by="id")
 merged$purchase <- ifelse(merged$logtarg!=0,1,0)
 ```
@@ -59,7 +54,7 @@ merged$purchase <- ifelse(merged$logtarg!=0,1,0)
 ## logistic regression
 ```{r}
 log1 <- glm(purchase~.,data = merged[,-c(1,38)],family = binomial)
-# step(log1)
+step(log1)
 
 log2 <- glm(formula = purchase ~ date + `6` + `8` + `10` + 
               `12` + `19` + `20` + `23` + `30` + `38`, family = binomial, 
@@ -73,10 +68,6 @@ lm1 <- lm(formula = logtarg ~ . + I(days_old-days_rec) + I(months_old-months_rec
 summary(lm1)
 
 step(lm1)
-# lm2 <- lm(formula = logtarg ~ totPrice + price.m + numOrd + 
-#      `7` + `14` + `20` + `27` + `35` + `40` + `50`, 
-#     data = merged[merged$logtarg != 0, -c(1, 41)])
-
 lm2 <- lm(formula = logtarg ~ totPrice + price.m + numOrd + months_rec + 
     years_rec + days_old + `7` + `14` + `20` + `26` + `27` + 
     `35` + `40` + `50`, data = merged[merged$logtarg != 0, -c(1, 
