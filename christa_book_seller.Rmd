@@ -21,10 +21,6 @@ library(lme4)
 book <- fread("orders.csv")
 train <- fread("booktrain.csv")
 
-# train/test sets
-book_train = train[seq(1, nrow(train), 2), ]
-book_test = train[seq(2, nrow(train), 2), ]
-
 # data type change
 ref_date <- as.Date("2014-08-01")
 book$orddate <- as.Date(book$orddate, format = "%d%B%Y")
@@ -32,17 +28,16 @@ book$days <- ref_date - book$orddate
 book$months <- (as.yearmon(ref_date, format = "%d%B%Y")-as.yearmon(book$orddate, format = "%d%B%Y")) * 12
 book$years <- year(ref_date) - year(book$orddate)
 
-
 # feature creation
 cat_dum <- dummy(factor(book$category))
 book <- cbind(book, cat_dum)
 
-hello <- aggregate(x=book[,10:38],by=list(book$id),FUN = sum)
+cat_agg <- aggregate(x=book[,10:38],by=list(book$id),FUN = sum)
 
 book <- book[,.(totQty = sum(qty), qty.m = mean(qty), totPrice = sum(price), logPrice = mean(log(price)), price.m = mean(price), numOrd = .N, days_rec = min(days), months_rec = min(months), years_rec = min(years),
                 days_old = max(days), months_old = max(months), years_old = max(years)), by=.(id)]
 
-book <- cbind(book,hello[,-1])
+book <- cbind(book,cat_agg[,-1])
 
 book$logPrice[book$logPrice == -Inf] <- 0
 
