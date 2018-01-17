@@ -1,0 +1,106 @@
+---
+title: "hw1"
+author: "Brooke Kennedy"
+date: "January 16, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(lubridate)
+library(lme4)
+library(dplyr)
+library(data.table)
+
+train <- read.csv('C:/Users/bck00/Documents/Winter 2018/Data Mining/hw1/booktrain.csv')
+orders <- read.csv('C:/Users/bck00/Documents/Winter 2018/Data Mining/hw1/orders.csv')
+```
+
+```{r}
+# change date format
+orders$orddate <- as.Date(orders$orddate, "%d%b%Y")
+orders$ordyear <- year(orders$orddate)
+orders$ordmonth <- month(orders$orddate)
+
+#make category dummy
+cat_dum <-dummy(factor(orders$category))
+orders <- cbind(orders, cat_dum)
+
+#make month dummy
+month_dum <- dummy(factor(orders$ordmonth))
+orders <- cbind(orders, month_dum)
+colnames(orders)[38] <- "feb"
+colnames(orders)[39] <- "march"
+colnames(orders)[40] <- "april"
+colnames(orders)[41] <- "may"
+colnames(orders)[42] <- "june"
+colnames(orders)[43] <- "july"
+colnames(orders)[44] <- "aug"
+colnames(orders)[45] <- "sep"
+colnames(orders)[46] <- "oct"
+colnames(orders)[47] <- "nov"
+colnames(orders)[48] <- "dec"
+
+#make year dummy
+year_dum <- dummy(factor(orders$ordyear))
+orders <- cbind(orders, year_dum)
+
+#combine by id
+orders_agg <- orders %>% group_by(id) %>% summarise(order_num=length(unique(factor(ordnum))),avg_price=mean(price),tot_price=sum(price),recency=min(as.Date('2014-08-01')-orddate))
+
+#sum orders categories by id
+cat_agg <- aggregate(x=orders[,9:37],by=list(orders$id),FUN = sum)
+orders_agg2 <- cbind(orders_agg,cat_agg[,-1])
+
+#sum orders by month
+month_agg <- aggregate(x=orders[,38:48],by=list(orders$id),FUN = sum)
+orders_agg2 <- cbind(orders_agg2, month_agg[,-1])
+
+#sum orders by year
+year_agg <- aggregate(x=orders[,49:55],by=list(orders$id),FUN = sum)
+orders_agg2 <- cbind(orders_agg2, year_agg[,-1])
+
+#train
+book_train <- orders_agg2[orders_agg2$id %in% train$id,]
+book_train <- merge(book_train,train,by='id')
+book_train$purchase <- ifelse(book_train$logtarg!=0,1,0)
+
+#test
+book_test <- orders_agg2[!orders_agg2$id %in% train$id,]
+```
+
+```{r}
+# logistic 
+log1 <- glm(purchase~.,data = book_train[,-c(1,53)],family = binomial)
+summary(log1)
+
+#step(log1)
+log2 <- glm(formula = purchase ~ order_num + recency + `5` + `6` + `8` + 
+    `19` + `20` + `23` + `30` + `38` + may + aug + `2008` + `2010` + 
+    `2014`, family = binomial, data = book_train[, -c(1, 53)])
+summary(log2)
+
+log2_pred <- predict(log2,newdata = book_test,type = 'response')
+
+# linear
+lm1 <- lm(logtarg~.,data = book_train[book_train$logtarg!=0,-54])
+summary(lm1)
+
+#step(lm1)
+lm2 <- lm(formula = logtarg ~ id + order_num + avg_price + tot_price + 
+    recency + `6` + `9` + `14` + `26` + `31` + `40` + `50` + 
+    `99` + feb + nov + `2009` + `2011`, data = book_train[book_train$logtarg != 
+    0, -54])
+summary(lm2)
+
+lm2_pred <- predict(lm2,newdata = book_test)
+
+result <- data.frame(id=book_test$id,yhat=lm2_pred*log2_pred)
+write.csv(result,'C:/Users/bck00/Documents/Winter 2018/Data Mining/hw1/results.csv',row.names = FALSE)
+
+#RMSE 0.62756
+
+```
